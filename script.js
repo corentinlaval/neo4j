@@ -429,19 +429,6 @@ async function checkAcquaintance(session,personName1, personFirstName1, personNa
 
 // Fonction pour suggérer des connaissances à un utilisateur
 async function suggest(session, choice, name, firstName){
-    // async function retrieveCompany(){
-    //     const query = `
-    //     MATCH (p:Personne {nom: $personName, prenom: $personFirstName})-[:A_TRAVAILLE_POUR {e: $entrepriseName}]
-    //     RETURN e
-    // `;
-    //     const result = await session.run(query, {
-    //         personName,
-    //         personFirstName,
-    //         entrepriseName
-    //     });
-
-    //     return result.records
-    // }
 
     async function findColleagues(entrepriseName="") {
         const query = `
