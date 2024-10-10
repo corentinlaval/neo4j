@@ -33,6 +33,10 @@ async function main() {
                     await addCompany(session);
                     break;
 
+                case "4":
+                    await addPerson(session);
+                    break;
+
                 case "exit":
                     continueloop = false;
                     console.log("Fermeture du programme...");
@@ -99,6 +103,7 @@ async function Welcome(){
     console.log("1. Remplir la bdd de données factices");
     console.log("2. Vider l'entièreté de la BDD");
     console.log("3. Ajouter une Entreprise");
+    console.log("4. Ajouter une Personne");
     console.log('Tapez "exit" pour sortir');
 
     const answer = await askQuestion("Entrez le numéro de l'action souhaitée : ");
@@ -154,6 +159,21 @@ async function addCompany(session){
     await createNode(session, "Entreprise", { nom: nom, secteur: secteur, description: description, taille: taille });
 
     console.log(nom + " à été ajoutée.");
+}
+
+async function addPerson(session){
+    console.log("Ajout d'une Personne:");
+    const nom = await askQuestion("Entrez le nom : ");
+    const prenom = await askQuestion("Son prénom : ");
+    const description = await askQuestion("Entrez une description de " + prenom + " "+ nom + " : ");
+    let competences = await askQuestion("Enfin, entrez ses compétences (séparées par des virgules) : ");
+
+    // Transformation de la chaîne de caractères en tableau
+    competences = competences.split(',').map(comp => comp.trim());
+
+    await createNode(session, "Personne", { nom: nom, prenom: prenom, description: description, "liste_des_compétences": competences });
+
+    console.log("La personne ' " + prenom + " " + nom + " ' à été ajoutée.");
 }
 
 // Fonction pour mettre à jour l'âge d'un nœud `Person` basé sur son nom
