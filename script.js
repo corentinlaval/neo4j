@@ -37,6 +37,11 @@ async function main() {
                     await addPerson(session);
                     break;
 
+                case "5":
+                    const choice = await DisplayChoiceRelation();
+                    await addRelation(session, choice);
+                    break;
+
                 case "exit":
                     continueloop = false;
                     console.log("Fermeture du programme...");
@@ -75,6 +80,16 @@ async function main() {
     console.log("Connexion terminée.");
 }
 
+async function DisplayChoiceRelation(){
+    console.log("Ajout d'une relation : ");
+    console.log("1. Entreprise / Personne");
+    console.log("2. Connaissances");
+    console.log("3. Collègues de travail");
+
+    const answer = await askQuestion("Entrez le numéro de l'action souhaitée : ");
+    return answer;
+}
+
 // Fonction pour créer un nœud
 async function createNode(session, label, properties) {
     const result = await session.run(
@@ -104,6 +119,7 @@ async function Welcome(){
     console.log("2. Vider l'entièreté de la BDD");
     console.log("3. Ajouter une Entreprise");
     console.log("4. Ajouter une Personne");
+    console.log("5. Ajouter une Relation");
     console.log('Tapez "exit" pour sortir');
 
     const answer = await askQuestion("Entrez le numéro de l'action souhaitée : ");
@@ -147,6 +163,12 @@ async function fillBDD(session){
     await createNode(session, "Personne", { nom: "Roux", prenom: "George", description: "Développeur mobile spécialisé dans le développement d'applications iOS", "liste_des_compétences": ["Swift", "Objective-C", "Xcode", "UI Design"] });
     await createNode(session, "Personne", { nom: "Blanc", prenom: "Hélène", description: "Data Scientist spécialisée dans le Machine Learning et l'IA", "liste_des_compétences": ["Python", "TensorFlow", "Scikit-learn", "NLP"] });
     await createNode(session, "Personne", { nom: "Petit", prenom: "Isabelle", description: "Responsable marketing digital avec un focus sur les stratégies de contenu", "liste_des_compétences": ["SEO", "SEM", "Content Marketing", "Google Analytics"] });
+
+    console.log("Remplissage des relations Personnes / Entreprises ")
+    await createRelationship(session, "Dupont", "Alice", "Google", "A_TRAVAILLE_POUR", "2018-01-01", "2020-12-31", "Développeuse Front-End");
+    await createRelationship(session, "Martin", "Bob", "Amazon", "A_TRAVAILLE_POUR", "2016-06-01", "2019-08-31", "Data Scientist");
+    await createRelationship(session, "Leroy", "Charlie", "Tesla", "A_TRAVAILLE_POUR", "2017-03-01", "2021-02-28", "Architecte Logiciel");
+
 }
 
 async function addCompany(session){
@@ -176,6 +198,66 @@ async function addPerson(session){
     console.log("La personne ' " + prenom + " " + nom + " ' à été ajoutée.");
 }
 
+// Fonction utilitaire pour vérifier que la date de début est antérieure à la date de fin
+function isDateOrderValid(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return start < end;
+}
+
+async function addRelation(session, choice) {
+
+    switch (choice){
+        case "1":
+            console.log("1. Entreprise / Personne");
+            console.log("Ajout d'une relation Personne / Entreprise : ");
+
+            // Récupération des informations de la personne et de l'entreprise
+            const nom = await askQuestion("Quel est le nom de la Personne : ");
+            const prenom = await askQuestion("Quel est le prénom de la Personne : ");
+            const entreprisename = await askQuestion("Dans quelle Entreprise a travaillé " + prenom + " " + nom + " : ");
+
+            // Saisie et vérification des dates
+            let startDate;
+            let endDate;
+
+            while (true) {
+                startDate = await askQuestion("Quand a commencé le travail (format AAAA-MM-JJ) : ");
+                endDate = await askQuestion("Quand s'est terminé le travail (format AAAA-MM-JJ) : ");
+
+                // Vérification de la cohérence des dates
+                if (isDateOrderValid(startDate, endDate)) {
+                    break; // Les dates sont valides, on sort de la boucle
+                } else {
+                    console.log("Erreur : La date de début doit être antérieure à la date de fin. Veuillez saisir à nouveau les dates.");
+                }
+            }
+
+            // Saisie du rôle occupé dans l'entreprise
+            const role = await askQuestion("Quel était le rôle de " + prenom + " dans cette entreprise : ");
+
+            // Création de la relation dans Neo4j
+            await createRelationship(session, nom, prenom, entreprisename, "A_TRAVAILLE_POUR", startDate, endDate, role);
+
+            console.log(`Relation ajoutée : ${prenom} ${nom} a travaillé pour ${entreprisename} de ${startDate} à ${endDate} en tant que ${role}.`);
+
+            break;
+
+        case "2":
+            console.log("2. Connaissances");
+            break;
+
+        case "3":
+            console.log("3. Collègues de travail");
+            break;
+
+        default:
+            console.log("Choix non reconnu");
+    }
+
+    }
+
+
 // Fonction pour mettre à jour l'âge d'un nœud `Person` basé sur son nom
 async function updateNodeAge(session, name, newAge) {
     const result = await session.run(
@@ -183,6 +265,24 @@ async function updateNodeAge(session, name, newAge) {
         { name, newAge }
     );
     // console.log(`Nœud mis à jour :`, result.records[0].get('n').properties);
+}
+
+async function createRelationship(session, personName, personFirstName, entrepriseName, relationType, startDate, endDate, role) {
+    const query = `
+        MATCH (p:Personne {nom: $personName, prenom: $personFirstName})
+        MATCH (e:Entreprise {nom: $entrepriseName})
+        CREATE (p)-[r:${relationType} {du: $startDate, au: $endDate, role: $role}]->(e)
+        RETURN r
+    `;
+    await session.run(query, {
+        personName,
+        personFirstName,
+        entrepriseName,
+        relationType,
+        startDate,
+        endDate,
+        role,
+    });
 }
 
 // Fonction pour supprimer un nœud `Person` basé sur son nom
