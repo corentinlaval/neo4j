@@ -29,6 +29,10 @@ async function main() {
                     await deleteAllNodes(session);
                     break;
 
+                case "3":
+                    await addCompany(session);
+                    break;
+
                 case "exit":
                     continueloop = false;
                     console.log("Fermeture du programme...");
@@ -91,9 +95,10 @@ async function deleteAllNodes(session){
 }
 
 async function Welcome(){
-    console.log('Bonjour, que souhaitez-vous faire ?');
-    console.log('1. Remplir la bdd de données factices');
+    console.log("Bonjour, que souhaitez-vous faire ?");
+    console.log("1. Remplir la bdd de données factices");
     console.log("2. Vider l'entièreté de la BDD");
+    console.log("3. Ajouter une Entreprise");
     console.log('Tapez "exit" pour sortir');
 
     const answer = await askQuestion("Entrez le numéro de l'action souhaitée : ");
@@ -137,6 +142,18 @@ async function fillBDD(session){
     await createNode(session, "Personne", { nom: "Roux", prenom: "George", description: "Développeur mobile spécialisé dans le développement d'applications iOS", "liste_des_compétences": ["Swift", "Objective-C", "Xcode", "UI Design"] });
     await createNode(session, "Personne", { nom: "Blanc", prenom: "Hélène", description: "Data Scientist spécialisée dans le Machine Learning et l'IA", "liste_des_compétences": ["Python", "TensorFlow", "Scikit-learn", "NLP"] });
     await createNode(session, "Personne", { nom: "Petit", prenom: "Isabelle", description: "Responsable marketing digital avec un focus sur les stratégies de contenu", "liste_des_compétences": ["SEO", "SEM", "Content Marketing", "Google Analytics"] });
+}
+
+async function addCompany(session){
+    console.log("Ajout d'une Entreprise:");
+    const nom = await askQuestion("Entrez le nom de l'entreprise : ");
+    const secteur = await askQuestion("Entrez son secteur d'activité : ");
+    const description = await askQuestion("Entrez la description de " + nom + " : ");
+    const taille = await askQuestion("Enfin, entrez sa taille : ");
+
+    await createNode(session, "Entreprise", { nom: nom, secteur: secteur, description: description, taille: taille });
+
+    console.log(nom + " à été ajoutée.");
 }
 
 // Fonction pour mettre à jour l'âge d'un nœud `Person` basé sur son nom
