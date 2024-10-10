@@ -42,6 +42,10 @@ async function main() {
                     await addRelation(session, choice);
                     break;
 
+                case "6":
+                    await retrieveSuggestions(session);
+                    break;
+                
                 case "exit":
                     continueloop = false;
                     console.log("Fermeture du programme...");
@@ -120,6 +124,7 @@ async function Welcome(){
     console.log("3. Ajouter une Entreprise");
     console.log("4. Ajouter une Personne");
     console.log("5. Ajouter une Relation");
+    console.log("6. Suggestion de Relations");
     console.log('Tapez "exit" pour sortir');
 
     const answer = await askQuestion("Entrez le numéro de l'action souhaitée : ");
@@ -166,6 +171,7 @@ async function fillBDD(session){
 
     console.log("Remplissage des relations Personnes / Entreprises ")
     await createRelationship(session, "Dupont", "Alice", "Google", "A_TRAVAILLE_POUR", "2018-01-01", "2020-12-31", "Développeuse Front-End");
+    await createRelationship(session, "Dupont", "Alice", "Tesla", "A_TRAVAILLE_POUR", "2018-01-01", "2021-01-01", "Développeuse Back-End");
     await createRelationship(session, "Martin", "Bob", "Amazon", "A_TRAVAILLE_POUR", "2016-06-01", "2019-08-31", "Data Scientist");
     await createRelationship(session, "Leroy", "Charlie", "Tesla", "A_TRAVAILLE_POUR", "2017-03-01", "2021-02-28", "Architecte Logiciel");
 
@@ -311,6 +317,17 @@ async function addRelation(session, choice) {
 
     }
 
+// Fonction pour demander des suggestions sur un utilisateur particulier
+async function retrieveSuggestions(session){
+    console.log("Suggestions : ");
+
+    // Récupération des informations de la personne et de l'entreprise
+    const nom = await askQuestion("Quel est le nom de la Personne : ");
+    const prenom = await askQuestion("Quel est le prénom de la Personne : ");
+
+    await suggest(session, nom, prenom);
+}
+
 
 // Fonction pour mettre à jour l'âge d'un nœud `Person` basé sur son nom
 async function updateNodeAge(session, name, newAge) {
@@ -321,6 +338,7 @@ async function updateNodeAge(session, name, newAge) {
     // console.log(`Nœud mis à jour :`, result.records[0].get('n').properties);
 }
 
+// Fonction pour ajouter une relation entre un utilisateur et une entreprise
 async function createRelationship(session, personName, personFirstName, entrepriseName, relationType, startDate, endDate, role) {
     const query = `
         MATCH (p:Personne {nom: $personName, prenom: $personFirstName})
@@ -339,6 +357,7 @@ async function createRelationship(session, personName, personFirstName, entrepri
     });
 }
 
+// Fonction pour ajouter une relation de connaissance entre deux utilisateurs
 async function createAcquaintance(session, personName1, personFirstName1, personName2, personFirstName2, meeting){
     const query = `
         MATCH (p:Personne {nom: $personName1, prenom: $personFirstName1})
@@ -356,6 +375,7 @@ async function createAcquaintance(session, personName1, personFirstName1, person
     });
 }
 
+// Fonction pour ajouter une relation de collègues entre deux utilisateurs
 async function createCoworkers(session, personName1, personFirstName1, personName2, personFirstName2, entrepriseName, startDate, endDate) {
     const query = `
         MATCH (p:Personne {nom: $personName1, prenom: $personFirstName1})
@@ -381,6 +401,7 @@ async function createCoworkers(session, personName1, personFirstName1, personNam
     }
 }
 
+// Fonction pour vérifier l'existence une relation de connaissance entre deux utilisateurs
 async function checkAcquaintance(session,personName1, personFirstName1, personName2, personFirstName2){
     const query = `MATCH (p:Personne{nom: $personName1, prenom: $personFirstName1})-[r:CONNAIT]-(q:Personne{nom: $personName2, prenom: $personFirstName2})
         RETURN r`;
@@ -398,6 +419,63 @@ async function checkAcquaintance(session,personName1, personFirstName1, personNa
         return true;
     }
 }
+
+// Fonction pour suggérer des connaissances à un utilisateur
+async function suggest(session, name, firstName){
+    // async function retrieveCompany(){
+    //     const query = `
+    //     MATCH (p:Personne {nom: $personName, prenom: $personFirstName})-[:A_TRAVAILLE_POUR {e: $entrepriseName}]
+    //     RETURN e
+    // `;
+    //     const result = await session.run(query, {
+    //         personName,
+    //         personFirstName,
+    //         entrepriseName
+    //     });
+
+    //     return result.records
+    // }
+
+    async function findColleagues() {
+        const query = `
+        MATCH (p:Personne {nom: $name, prenom: $firstName})-[work1:A_TRAVAILLE_POUR]->(e:Entreprise)
+        MATCH (colleague)-[work2:A_TRAVAILLE_POUR]->(e)
+        WHERE colleague <> p
+        AND (((date(work1.du) <= date(work2.du)) AND (date(work2.du) <= date(work1.au)))
+                OR ((date(work1.du) <= date(work2.au)) AND (date(work2.au) <= date(work1.au)))
+                OR ((date(work2.du) <= date(work1.du)) AND (date(work1.du) <= date(work2.au)))
+                OR ((date(work2.du) <= date(work1.au)) AND (date(work1.au) <= date(work2.au))))
+        RETURN DISTINCT colleague
+    `;
+    
+        const result = await session.run(query, {
+            name,
+            firstName
+        });
+
+        console.log('Colleagues who worked at the same time in the same companies:', result.records.map(r => r.get('colleague').properties));
+    }
+
+    async function findConnectionFromFriends(){
+        const query = `
+        MATCH (p:Personne {nom: $name, prenom: $firstName})-[conn1:CONNAIT]->(q:Personne)
+        MATCH (q)-[conn2:CONNAIT]->(r:Personne)
+        WHERE r <> p
+        RETURN DISTINCT r
+    `;
+    
+        const result = await session.run(query, {
+            name,
+            firstName
+        });
+
+        console.log('Connections of my connections:', result.records.map(r => r.get('r').properties));
+    }
+
+    await findColleagues();
+    await findConnectionFromFriends();
+}
+
 // Fonction pour supprimer un nœud `Person` basé sur son nom
 async function deleteNode(session, name) {
     const result = await session.run(
