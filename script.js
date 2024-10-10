@@ -30,11 +30,11 @@ async function main() {
                     break;
 
                 case "3":
-                    await addCompany(session);
+                    await addMenu(session);
                     break;
 
                 case "4":
-                    await addPerson(session);
+                    await searchMenu(session);
                     break;
 
                 case "5":
@@ -116,13 +116,31 @@ async function deleteAllNodes(session){
     const result = await session.run(`MATCH (n) DETACH DELETE n`);
     console.log("La BDD est vide");
 }
+async function addMenu(session){
+    console.log("Ajouter un noeud à la BDD : ");
+    console.log("1. Ajouter une entreprise");
+    console.log("2. Ajouter une personne");
 
+    const answer = await askQuestion("Entrez le numéro de l'action souhaitée : ");
+    switch (answer){
+        case "1":
+            await addCompany(session);
+            break;
+
+        case "2":
+            await addPerson(session);
+            break;
+
+        default:
+            console.log("Choix non reconnu");
+    }
+}
 async function Welcome(){
     console.log("Bonjour, que souhaitez-vous faire ?");
     console.log("1. Remplir la bdd de données factices");
     console.log("2. Vider l'entièreté de la BDD");
-    console.log("3. Ajouter une Entreprise");
-    console.log("4. Ajouter une Personne");
+    console.log("3. Ajouter un noeud à la BDD");
+    console.log("4. Rechercher un noeud");
     console.log("5. Ajouter une Relation");
     console.log("6. Suggestion de Relations");
     console.log('Tapez "exit" pour sortir');
@@ -143,10 +161,20 @@ function askQuestion(query) {
         resolve(answer);
     }));
 }
-
+async function createIndexes(session) {
+    try {
+        console.log("Création des index...");
+        await session.run(`CREATE INDEX index_personne_nom FOR (p:Personne) ON (p.nom);`);
+        await session.run(`CREATE INDEX index_entreprise_nom FOR (e:Entreprise) ON (e.nom);`);
+        console.log("Index créés avec succès !");
+    } catch (error) {
+        console.error("Erreur lors de la création des index :", error);
+    }
+}
 async function fillBDD(session){
     console.log("Remplissage de la BDD");
     console.log("Remplissage des Entreprises");
+    await createIndexes(session);
     await createNode(session, "Entreprise", { nom: "IKEA", secteur: "Mobilier", description: "Leader mondial dans le domaine de la vente de meubles en kit", taille: 100000 });
     await createNode(session, "Entreprise", { nom: "Google", secteur: "Technologie", description: "Multinationale spécialisée dans les services et produits technologiques", taille: 150000 });
     await createNode(session, "Entreprise", { nom: "Amazon", secteur: "E-commerce", description: "Plateforme d'e-commerce proposant divers produits", taille: 1300000 });
@@ -184,6 +212,8 @@ async function fillBDD(session){
     await createCoworkers(session, "Roux", "George", "Blanc", "Hélène", "IKEA",  "2018-01-01", "2019-08-31");
     await createCoworkers(session, "Dupont", "Alice", "Petit", "Isabelle", "Google", "2018-05-01", "2020-06-30");
     await createCoworkers(session, "Leroy", "Charlie", "Durand", "Eva", "Tesla", "2019-04-01", "2021-03-31");
+
+
 }
 
 async function addCompany(session){
@@ -492,6 +522,58 @@ async function suggest(session, choice, name, firstName){
             break;
     }
     
+}
+
+async function findEnterpriseByName(session, name) {
+    const result = await session.run(`
+        MATCH (e:Entreprise)
+        WHERE e.nom = $name
+        RETURN e
+    `, { name });
+
+    if (result.records.length > 0) {
+        console.log("Entreprise trouvée :");
+        result.records.forEach(record => console.log(record.get('e').properties));
+    } else {
+        console.log("Aucune entreprise trouvée avec ce nom.");
+    }
+}
+
+async function searchMenu(session){
+    console.log("Recherche d'un noeud");
+    console.log("1. Rechercher une entreprise");
+    console.log("2. Rechercher une personne");
+    const answer = await askQuestion("Entrez le numéro de l'action souhaitée :");
+
+    switch(answer){
+        case "1":
+            const name = await askQuestion("Entrez le nom de l'entreprise recherchée : ");
+            await findEnterpriseByName(session, name)
+            break;
+
+        case "2":
+            const nom = await askQuestion("Entrez le nom de la personne recherchée : ");
+            const prenom = await askQuestion("Entrez le prénom de la personne recherchée : ");
+            await findPersonByName(session, nom, prenom)
+            break;
+
+        default:
+            console.log("Choix non reconnu");
+    }
+}
+async function findPersonByName(session, nom, prenom) {
+    const result = await session.run(`
+        MATCH (p:Personne)
+        WHERE p.nom = $nom AND p.prenom = $prenom
+        RETURN p
+    `, { nom, prenom });
+
+    if (result.records.length > 0) {
+        console.log("Personne trouvée :");
+        result.records.forEach(record => console.log(record.get('p').properties));
+    } else {
+        console.log("Aucune personne trouvée avec ce nom.");
+    }
 }
 
 // Fonction pour supprimer un nœud `Person` basé sur son nom
