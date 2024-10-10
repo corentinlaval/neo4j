@@ -169,6 +169,15 @@ async function fillBDD(session){
     await createRelationship(session, "Martin", "Bob", "Amazon", "A_TRAVAILLE_POUR", "2016-06-01", "2019-08-31", "Data Scientist");
     await createRelationship(session, "Leroy", "Charlie", "Tesla", "A_TRAVAILLE_POUR", "2017-03-01", "2021-02-28", "Architecte Logiciel");
 
+    console.log("Remplissage des connaissances ")
+    await createAcquaintance(session, "Roux", "George", "Blanc", "Hélène", "2015-01-01");
+    await createAcquaintance(session, "Martin", "Bob", "Petit", "Isabelle", "2017-05-15");
+    await createAcquaintance(session, "Moreau", "Frank", "Durand", "Eva", "2020-09-10");
+
+    console.log("Remplissage des relations de collègues ")
+    await createCoworkers(session, "Roux", "George", "Blanc", "Hélène", "IKEA",  "2018-01-01", "2019-08-31");
+    await createCoworkers(session, "Dupont", "Alice", "Petit", "Isabelle", "Google", "2018-05-01", "2020-06-30");
+    await createCoworkers(session, "Leroy", "Charlie", "Durand", "Eva", "Tesla", "2019-04-01", "2021-03-31");
 }
 
 async function addCompany(session){
@@ -245,10 +254,55 @@ async function addRelation(session, choice) {
 
         case "2":
             console.log("2. Connaissances");
+            console.log("Ajout d'une connaissance : ");
+
+            // Récupération des informations des personnes
+            const nom_1 = await askQuestion("Quel est le nom de la Personne 1: ");
+            const prenom_1 = await askQuestion("Quel est le prénom de la Personne 1: ");
+            const nom_2 = await askQuestion("Quel est le nom de la Personne 2: ");
+            const prenom_2 = await askQuestion("Quel est le prénom de la Personne 2: ");
+            
+            // Récupération de la date de rencontre
+            const dateRencontre = await askQuestion("Quand se sont-elles rencontrées (format AAAA-MM-JJ) : ");
+
+            await createAcquaintance(session, nom_1, prenom_1, nom_2, prenom_2, dateRencontre);
+
+            console.log(`Relation ajoutée : ${prenom_1} ${nom_1} connait ${prenom_2} ${nom_2} depuis ${dateRencontre}`);
+
             break;
 
         case "3":
             console.log("3. Collègues de travail");
+            console.log("Ajout d'une relation de collègues : ");
+
+            // Récupération des informations des personnes et de l'entreprise
+            const nom_1_collègue = await askQuestion("Quel est le nom de la Personne 1: ");
+            const prenom_1_collègue = await askQuestion("Quel est le prénom de la Personne 1: ");
+            const nom_2_collègue = await askQuestion("Quel est le nom de la Personne 2: ");
+            const prenom_2_collègue = await askQuestion("Quel est le prénom de la Personne 2: ");
+            const entreprisename_collègue = await askQuestion("Dans quelle Entreprise ont-ils travaillé : ");
+
+            // Saisie et vérification des dates
+            let startDate_collègue;
+            let endDate_collègue;
+
+            while (true) {
+                startDate_collègue = await askQuestion("Quand a commencé le travail (format AAAA-MM-JJ) : ");
+                endDate_collègue = await askQuestion("Quand s'est terminé le travail (format AAAA-MM-JJ) : ");
+
+                // Vérification de la cohérence des dates
+                if (isDateOrderValid(startDate_collègue, endDate_collègue)) {
+                    break; // Les dates sont valides, on sort de la boucle
+                } else {
+                    console.log("Erreur : La date de début doit être antérieure à la date de fin. Veuillez saisir à nouveau les dates.");
+                }
+            }
+
+            //Ajoute une relation de collègue et ajoute si besoin une connaissance
+            await createCoworkers(session, nom_1_collègue, prenom_1_collègue, nom_2_collègue, prenom_2_collègue, entreprisename_collègue, startDate_collègue, endDate_collègue);            
+            
+            console.log(`Relation ajoutée : ${prenom_1_collègue} ${nom_1_collègue} a travaillé avec ${prenom_2_collègue} ${nom_2_collègue} chez ${entreprisename_collègue} entre ${startDate_collègue} et ${endDate_collègue}`);
+
             break;
 
         default:
@@ -285,6 +339,65 @@ async function createRelationship(session, personName, personFirstName, entrepri
     });
 }
 
+async function createAcquaintance(session, personName1, personFirstName1, personName2, personFirstName2, meeting){
+    const query = `
+        MATCH (p:Personne {nom: $personName1, prenom: $personFirstName1})
+        MATCH (q:Personne {nom: $personName2, prenom: $personFirstName2})
+        CREATE (p)-[r:CONNAIT {depuis: $meeting}]->(q)
+        CREATE (q)-[s:CONNAIT {depuis: $meeting}]->(p)
+        RETURN r,s
+    `;
+    await session.run(query, {
+        personName1,
+        personFirstName1,
+        personName2,
+        personFirstName2,
+        meeting,
+    });
+}
+
+async function createCoworkers(session, personName1, personFirstName1, personName2, personFirstName2, entrepriseName, startDate, endDate) {
+    const query = `
+        MATCH (p:Personne {nom: $personName1, prenom: $personFirstName1})
+        MATCH (q:Personne {nom: $personName2, prenom: $personFirstName2})
+        CREATE (p)-[r:COLLEGUE_AVEC {du: $startDate, au: $endDate, entreprise: $entrepriseName}]->(q)
+        CREATE (q)-[s:COLLEGUE_AVEC {du: $startDate, au: $endDate, entreprise: $entrepriseName}]->(p)
+        RETURN r,s
+    `;
+    await session.run(query, {
+        personName1,
+        personFirstName1,
+        personName2,
+        personFirstName2,
+        startDate,
+        endDate,
+        entrepriseName,
+    });
+    
+    //Vérifie s'il existe déjà une relation de connaissance. Si non, en crée une
+    const check = await checkAcquaintance(session, personName1, personFirstName1, personName2, personFirstName2);
+    if(!check){
+        await createAcquaintance(session, personName1, personFirstName1, personName2, personFirstName2, startDate);
+    }
+}
+
+async function checkAcquaintance(session,personName1, personFirstName1, personName2, personFirstName2){
+    const query = `MATCH (p:Personne{nom: $personName1, prenom: $personFirstName1})-[r:CONNAIT]-(q:Personne{nom: $personName2, prenom: $personFirstName2})
+        RETURN r`;
+    const result = await session.run(query, {
+        personName1,
+        personFirstName1,
+        personName2,
+        personFirstName2,
+    });
+
+    if (result.records.length === 0){
+        return false;
+    }
+    else{
+        return true;
+    }
+}
 // Fonction pour supprimer un nœud `Person` basé sur son nom
 async function deleteNode(session, name) {
     const result = await session.run(
