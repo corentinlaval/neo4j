@@ -324,8 +324,15 @@ async function retrieveSuggestions(session){
     // Récupération des informations de la personne et de l'entreprise
     const nom = await askQuestion("Quel est le nom de la Personne : ");
     const prenom = await askQuestion("Quel est le prénom de la Personne : ");
+    
+    // Quelles info récupérer
+    console.log("Quelle information afficher ? ")
+    console.log("1. Suggestions à partir de l'entreprise");
+    console.log("2. Suggestions à partir du réseau");
+    console.log("3. Suggestions globales");
+    const choice = await askQuestion("Entrez le numéro de l'action souhaitée :");
 
-    await suggest(session, nom, prenom);
+    await suggest(session, choice, nom, prenom);
 }
 
 
@@ -421,7 +428,7 @@ async function checkAcquaintance(session,personName1, personFirstName1, personNa
 }
 
 // Fonction pour suggérer des connaissances à un utilisateur
-async function suggest(session, name, firstName){
+async function suggest(session, choice, name, firstName){
     // async function retrieveCompany(){
     //     const query = `
     //     MATCH (p:Personne {nom: $personName, prenom: $personFirstName})-[:A_TRAVAILLE_POUR {e: $entrepriseName}]
@@ -436,24 +443,31 @@ async function suggest(session, name, firstName){
     //     return result.records
     // }
 
-    async function findColleagues() {
+    async function findColleagues(entrepriseName="") {
         const query = `
-        MATCH (p:Personne {nom: $name, prenom: $firstName})-[work1:A_TRAVAILLE_POUR]->(e:Entreprise)
-        MATCH (colleague)-[work2:A_TRAVAILLE_POUR]->(e)
-        WHERE colleague <> p
-        AND (((date(work1.du) <= date(work2.du)) AND (date(work2.du) <= date(work1.au)))
-                OR ((date(work1.du) <= date(work2.au)) AND (date(work2.au) <= date(work1.au)))
-                OR ((date(work2.du) <= date(work1.du)) AND (date(work1.du) <= date(work2.au)))
-                OR ((date(work2.du) <= date(work1.au)) AND (date(work1.au) <= date(work2.au))))
-        RETURN DISTINCT colleague
-    `;
+            MATCH (p:Personne {nom: $name, prenom: $firstName})-[work1:A_TRAVAILLE_POUR]->(e:Entreprise)
+            MATCH (colleague)-[work2:A_TRAVAILLE_POUR]->(e)
+            WHERE colleague <> p
+            AND (((date(work1.du) <= date(work2.du)) AND (date(work2.du) <= date(work1.au)))
+                    OR ((date(work1.du) <= date(work2.au)) AND (date(work2.au) <= date(work1.au)))
+                    OR ((date(work2.du) <= date(work1.du)) AND (date(work1.du) <= date(work2.au)))
+                    OR ((date(work2.du) <= date(work1.au)) AND (date(work1.au) <= date(work2.au))))
+            ${entrepriseName ? `AND e.nom = $entrepriseName` : ''}
+            RETURN DISTINCT colleague
+        `;
     
         const result = await session.run(query, {
             name,
-            firstName
+            firstName,
+            entrepriseName: entrepriseName || undefined
         });
 
-        console.log('Colleagues who worked at the same time in the same companies:', result.records.map(r => r.get('colleague').properties));
+        if(result.records.length > 0){
+            console.log('Colleagues who worked at the same time in the same companies:', result.records.map(r => r.get('colleague').properties));
+        }
+        else{
+            console.log("No one worked at the same time in these companies")
+        }
     }
 
     async function findConnectionFromFriends(){
@@ -471,9 +485,26 @@ async function suggest(session, name, firstName){
 
         console.log('Connections of my connections:', result.records.map(r => r.get('r').properties));
     }
+    switch (choice){
+        case "1":
+            console.log("Suggestions à partir de l'entreprise. ")
+            console.log("Quelle entreprise afficher ? ")
+            const entrepriseName = await askQuestion("Laisser vide pour afficher des collègues de toutes les entreprises cotoyées :");
+            await findColleagues(entrepriseName);
+            break;
 
-    await findColleagues();
-    await findConnectionFromFriends();
+        case "2":
+            console.log("Suggestions à partir du réseau. ")
+            await findConnectionFromFriends();
+            break;
+        
+        case "3":
+            console.log("Suggestions globales. ")
+            await findColleagues("");
+            await findConnectionFromFriends();
+            break;
+    }
+    
 }
 
 // Fonction pour supprimer un nœud `Person` basé sur son nom
